@@ -132,3 +132,51 @@ int AttrCacheTable::resetSearchIndex(int relId, int attrOffset) {
     IndexId indexId = {-1, -1};
     return setSearchIndex(relId, attrOffset, &indexId);
 }
+
+int AttrCacheTable::setAttrCatEntry(int relId, char attrName[ATTR_SIZE], AttrCatEntry* attrCatBuf) {
+    if (relId < 0 || relId >= MAX_OPEN)
+        return E_OUTOFBOUND;
+
+    if (attrCache[relId] == nullptr)
+        return E_RELNOTOPEN;
+
+    for (auto attrCacheEntry = attrCache[relId]; attrCacheEntry != nullptr; attrCacheEntry = attrCacheEntry->next) {
+        auto attrCatEntry = attrCacheEntry->attrCatEntry;
+        if (strcmp(attrCatEntry.attrName, attrName) == 0) {
+            attrCacheEntry->attrCatEntry = *attrCatBuf;
+            attrCacheEntry->dirty = true;
+            return SUCCESS;
+        }
+    }
+
+
+    return E_ATTRNOTEXIST;
+}
+
+
+int AttrCacheTable::setAttrCatEntry(int relId, int attrOffset, AttrCatEntry* attrCatBuf) {
+    if (relId < 0 || relId >= MAX_OPEN)
+        return E_OUTOFBOUND;
+
+    if (attrCache[relId] == nullptr)
+        return E_RELNOTOPEN;
+
+    for (auto attrCacheEntry = attrCache[relId]; attrCacheEntry != nullptr; attrCacheEntry = attrCacheEntry->next) {
+        auto attrCatEntry = attrCacheEntry->attrCatEntry;
+        if (attrCatEntry.offset == attrOffset) {
+            attrCacheEntry->attrCatEntry = *attrCatBuf;
+            attrCacheEntry->dirty = true;
+            return SUCCESS;
+        }
+    }
+    return E_ATTRNOTEXIST;
+}
+
+void AttrCacheTable::attrCatEntryToRecord(AttrCatEntry *attrCatEntry, union Attribute record[ATTRCAT_NO_ATTRS]) {
+    strcpy(record[ATTRCAT_REL_NAME_INDEX].sVal, attrCatEntry->relName);
+    strcpy(record[ATTRCAT_ATTR_NAME_INDEX].sVal, attrCatEntry->attrName);
+    record[ATTRCAT_ATTR_TYPE_INDEX].nVal = (double) attrCatEntry->attrType;
+    record[ATTRCAT_PRIMARY_FLAG_INDEX].nVal = (double) attrCatEntry->primaryFlag;
+    record[ATTRCAT_ROOT_BLOCK_INDEX].nVal = (double) attrCatEntry->rootBlock;
+    record[ATTRCAT_OFFSET_INDEX].nVal = (double) attrCatEntry->offset;
+}

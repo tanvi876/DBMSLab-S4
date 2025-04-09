@@ -174,27 +174,43 @@ int OpenRelTable::closeRel(int relId) {
     if (relId < 0 || relId >= MAX_OPEN)
         return E_OUTOFBOUND;
 
-    if (OpenRelTable::tableMetaInfo[relId].free)
+    if (tableMetaInfo[relId].free == true)
         return E_RELNOTOPEN;
-    
-    //releasing the relcache entry of the relation
-    if(RelCacheTable::relCache[relId]->dirty=true){
-          Attribute record[RELCAT_NO_ATTRS];
-          RelCacheTable::relCatEntryToRecord(&RelCacheTable::relCache[relId]->relCatEntry, record);
-          RecId recId = RelCacheTable::relCache[relId]->recId;
-          RecBuffer relCatBlock(recId.block);
-          relCatBlock.setRecord(record, recId.slot);
+
+
+    RelCacheEntry* relCacheEntry = RelCacheTable::relCache[relId];
+
+    if (relCacheEntry && relCacheEntry->dirty == true) {
+        RecBuffer relCatBlock((relCacheEntry->recId).block);
+
+        RelCatEntry relCatEntry = relCacheEntry->relCatEntry;
+        Attribute record[RELCAT_NO_ATTRS];
+
+        RelCacheTable::relCatEntryToRecord(&relCatEntry, record);
+
+        relCatBlock.setRecord(record, (relCacheEntry->recId).slot);
     }
-    //releasing attrcache entry of the relation
 
-
-    OpenRelTable::tableMetaInfo[relId].free = true;
-    free(RelCacheTable::relCache[relId]);
-    clearList(AttrCacheTable::attrCache[relId]);
-
+    free(relCacheEntry);
     RelCacheTable::relCache[relId] = nullptr;
+
+    for (auto attrCacheEntry = AttrCacheTable::attrCache[relId]; attrCacheEntry != nullptr; attrCacheEntry = attrCacheEntry->next) {
+        if (attrCacheEntry && attrCacheEntry->dirty == true) {
+            RecBuffer attrCatBlock((attrCacheEntry->recId).block);
+
+            AttrCatEntry attrCatEntry = attrCacheEntry->attrCatEntry;
+            Attribute record[ATTRCAT_NO_ATTRS];
+
+            AttrCacheTable::attrCatEntryToRecord(&attrCatEntry, record);
+
+            attrCatBlock.setRecord(record, (attrCacheEntry->recId).slot);
+        }
+    }
+
+    clearList(AttrCacheTable::attrCache[relId]);
     AttrCacheTable::attrCache[relId] = nullptr;
 
+    tableMetaInfo[relId].free = true;
     return SUCCESS;
 }
 
